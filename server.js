@@ -3,7 +3,9 @@ const app = require("./app");
 require("dotenv").config();
 const mongoUrl = process.env.HOST_URL;
 const mongoose = require("mongoose");
+mongoose.Promise = global.Promise;
 mongoose.set("autoCreate", false);
+require("./config/config-passport");
 mongoose
   .connect(mongoUrl)
   .then(() => {

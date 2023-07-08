@@ -4,14 +4,14 @@ const router = express.Router();
 
 router.get("/", contactsController.getContacts);
 
-router.get("/:contactId", contactsController.getContactById);
+router.get("/:id", contactsController.getContactById);
 
 router.post("/", contactsController.addContact);
 
-router.delete("/:contactId", contactsController.deleteContact);
+router.delete("/:id", contactsController.deleteContact);
 
-router.put("/:contactId", contactsController.updateContact);
+router.put("/:id", contactsController.updateContact);
 
-router.patch("/:contactId/favorite", contactsController.setFavorite);
+router.patch("/:id/favorite", contactsController.setFavorite);
 
 module.exports = router;

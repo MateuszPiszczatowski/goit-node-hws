@@ -5,7 +5,7 @@ const contact = new Schema(
     name: {
       type: String,
       minlength: 2,
-      maxlength: 80,
+      maxlength: 30,
       required: "Contacts name is required",
     },
     email: {
@@ -17,11 +17,9 @@ const contact = new Schema(
         "Email address must be in proper format e. 'xyz@xyz.xyz'",
       ],
       required: "Email address is required",
-      unique: true,
     },
     phone: {
       type: String,
-      unique: true,
       required: "Contacts phone number is required",
       match: [
         /^(\+|0)?((((\d{2})+[ -]?)?\d{3}[ -]?\d{3}[ -]?\d{3})|((((\+?\d{2})+[ -]?)?\d{3}[ -]?\d{2}[ -]?\d{2})))$/,
@@ -32,9 +30,14 @@ const contact = new Schema(
       type: Boolean,
       default: false,
     },
+    owner: {
+      type: Schema.Types.ObjectId,
+      ref: "user",
+      required: "Owner of a contact is required",
+    },
   },
   { versionKey: false, timestamps: true }
 );
 
-const Contact = model("Contact", contact, "contacts");
+const Contact = model("contact", contact, "contacts");
 module.exports = Contact;

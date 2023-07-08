@@ -1,8 +1,8 @@
-const contactsService = require("../services/mongodb");
+const contactsService = require("../services/contacts");
 const Contact = require("../services/schemas/contact");
 const getContacts = async (req, res, next) => {
   try {
-    res.json(await contactsService.getContacts());
+    res.json(await contactsService.get());
   } catch (e) {
     console.log(e.message);
     next(e);
@@ -11,7 +11,7 @@ const getContacts = async (req, res, next) => {
 
 const getContactById = async (req, res, next) => {
   try {
-    const contact = await contactsService.getContactById(req.params.contactId);
+    const contact = await contactsService.getById(req.params.id);
     if (contact) {
       res.json(contact);
       return;
@@ -25,12 +25,9 @@ const getContactById = async (req, res, next) => {
 
 const addContact = async (req, res, next) => {
   try {
-    const contact = { name: req.body.name, email: req.body.email, phone: req.body.phone };
-    if (req.body.favorite) {
-      contact.favorite = req.body.favorite;
-    }
-    const addResult = await contactsService.addContact(contact);
-    res.status(addResult.name ? 201 : 400).json(addResult);
+    const contact = req.body;
+    const addResult = await contactsService.add(contact);
+    res.status(addResult._id ? 201 : 400).json(addResult.message);
   } catch (e) {
     console.log(e.message);
     next(e);
@@ -39,8 +36,8 @@ const addContact = async (req, res, next) => {
 
 const deleteContact = async (req, res, next) => {
   try {
-    const removed = await contactsService.deleteContact(req.params.contactId);
-    if (removed) {
+    const removed = await contactsService.remove(req.params.id);
+    if (removed._id) {
       res.json({ message: "contact deleted" });
       return;
     }
@@ -68,21 +65,14 @@ const prepareContact = (contact) => {
 
 const updateContact = async (req, res, next) => {
   try {
-    const contact = { name: req.body.name, email: req.body.email, phone: req.body.phone };
-    if (req.body.favorite !== undefined) {
-      contact.favorite = req.body.favorite;
-    }
-
+    const contact = req.body;
     const contactInvalidity = isContactInvalid(contact);
     if (contactInvalidity) {
       res.status(400).json(contactInvalidity);
     }
 
-    const updateResult = await contactsService.updateContact(
-      req.params.contactId,
-      prepareContact(contact)
-    );
-    if (updateResult.name) {
+    const updateResult = await contactsService.update(req.params.id, prepareContact(contact));
+    if (updateResult._id) {
       res.status(200).json(updateResult);
       return;
     }
@@ -101,10 +91,10 @@ const setFavorite = async (req, res, next) => {
       res.status(400).json({ message: "missing field favorite" });
       return;
     }
-    const patchResult = await contactsService.updateContact(req.params.contactId, {
+    const patchResult = await contactsService.update(req.params.id, {
       favorite: isFavorite,
     });
-    res.status(patchResult.name === undefined ? 404 : 200).json(patchResult);
+    res.status(patchResult._id === undefined ? 404 : 200).json(patchResult);
   } catch (e) {
     console.log(e.message);
     next(e);
