@@ -3,8 +3,15 @@ const validators = require("../utils/validators");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const passport = require("passport");
+const path = require("path");
+const Jimp = require("jimp");
+const nanoid = import("nanoid");
+
 require("dotenv").config();
 const secret = process.env.SECRET;
+const gravatar = require("gravatar");
+const fs = require("fs").promises;
+const storeImage = path.join(process.cwd(), "\\public\\avatars");
 
 const getUsers = async (req, res, next) => {
   try {
@@ -129,7 +136,11 @@ const validateAndEncryptMiddleware = async (req, res, next) => {
 const signup = async (req, res, next) => {
   try {
     const user = req.body;
+    if (user.email) {
+      user.avatarURL = gravatar.url(user.email, { s: 200 });
+    }
     const addResult = await usersService.add(user);
+
     if (addResult._id) {
       return res
         .status(201)
@@ -137,13 +148,43 @@ const signup = async (req, res, next) => {
     }
     res.status(400).json(addResult.message);
   } catch (e) {
-    console.log(e.message);
+    next(e);
+  }
+};
+
+const changeAvatar = async (req, res, next) => {
+  try {
+    const { path: temporaryName, originalname } = req.file;
+    const currentNames = await fs.readdir(storeImage);
+    let uniqueName = originalname;
+    while (currentNames.includes(uniqueName)) {
+      uniqueName = originalname;
+      const extension = path.extname(uniqueName);
+      uniqueName = uniqueName.slice(0, -extension.length);
+      uniqueName = uniqueName + (await nanoid).nanoid() + extension;
+    }
+    const fileName = path.join(storeImage, uniqueName);
+    try {
+      const lenna = await Jimp.read(temporaryName);
+      await lenna.resize(250, 250).quality(75).writeAsync(fileName);
+      const updateResult = await usersService.update(req.user.id, { avatarURL: fileName });
+      if (!updateResult._id) {
+        fs.unlink(fileName);
+        return res.status(500).json({ message: "error during updating user account" });
+      }
+    } catch (err) {
+      await fs.unlink(temporaryName);
+      return next(err);
+    }
+    return res.json({ message: "File uploaded successfully", status: 200 });
+  } catch (e) {
     next(e);
   }
 };
 
 module.exports = {
   getUsers,
+  changeAvatar,
   login,
   signup,
   validateAndEncryptMiddleware,

@@ -33,7 +33,7 @@ const addContact = async (req, res, next) => {
     const contact = req.body;
     contact.owner = req.user.id;
     const addResult = await contactsService.add(contact);
-    return res.status(addResult._id ? 201 : 400).json({ addResult });
+    return res.status(addResult._id ? 201 : 400).json(addResult);
   } catch (e) {
     console.log(e.message);
     return next(e);
