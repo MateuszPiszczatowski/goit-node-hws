@@ -18,7 +18,16 @@ const addData = async (DataSource, data) => {
     return await DataSource.create(new DataSource(data));
   } catch (error) {
     console.log(error);
-    return { message: error };
+    let message;
+    if (error.errors) {
+      message = Object.keys(error.errors).reduce(
+        (acc, errorKey) => acc + `${error.errors[errorKey]}; `,
+        ""
+      );
+    } else {
+      message = error;
+    }
+    return { message: message };
   }
 };
 

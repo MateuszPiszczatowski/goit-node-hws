@@ -17,13 +17,18 @@ const getUsers = async (req, res, next) => {
 
 const tokenAuth = async (req, res, next) => {
   passport.authenticate("jwt", { session: false }, (err, user) => {
-    const bearer = [...req.get("Authorization")];
-    bearer.splice(0, 7);
-    if (!user || err || user.token !== bearer.join("")) {
-      return res.status(401).json({ message: "Not authorized" });
+    const bearerString = req.get("Authorization");
+    if (bearerString && bearerString !== "") {
+      const bearer = [...bearerString];
+      bearer.splice(0, 7);
+      if (!user || err || user.token !== bearer.join("")) {
+        console.log("Here");
+        return res.status(401).json({ message: "Not Authorized" });
+      }
+      req.user = user;
+      return next();
     }
-    req.user = user;
-    next();
+    return res.status(401).json({ message: "Not Authorized, authorization header is missing" });
   })(req, res, next);
 };
 
@@ -59,7 +64,6 @@ const login = async (req, res, next) => {
         if (bcrypt.compareSync(req.body.password, user.password)) {
           const payload = {
             id: user._id,
-            email: user.email,
             subscription: user.subscription,
           };
           const token = jwt.sign(payload, secret);

@@ -1,4 +1,3 @@
-const User = require("../services/users");
 const Joi = require("joi");
 
 const validateUser = (user) => {
