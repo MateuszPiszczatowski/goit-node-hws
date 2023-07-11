@@ -167,6 +167,7 @@ const changeAvatar = async (req, res, next) => {
     try {
       const lenna = await Jimp.read(temporaryName);
       await lenna.resize(250, 250).quality(75).writeAsync(fileName);
+      await fs.unlink(temporaryName);
       const updateResult = await usersService.update(req.user.id, { avatarURL: fileName });
       if (!updateResult._id) {
         fs.unlink(fileName);
@@ -192,4 +193,5 @@ module.exports = {
   logout,
   tokenAuth,
   current,
+  storeImage,
 };
