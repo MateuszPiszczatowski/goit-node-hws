@@ -11,7 +11,7 @@ require("dotenv").config();
 const secret = process.env.SECRET;
 const gravatar = require("gravatar");
 const fs = require("fs").promises;
-const storeImage = path.join(process.cwd(), "\\public\\avatars");
+const storeImage = path.join(process.cwd(), "public", "avatars");
 
 const getUsers = async (req, res, next) => {
   try {
