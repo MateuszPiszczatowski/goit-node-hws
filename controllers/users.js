@@ -6,9 +6,11 @@ const passport = require("passport");
 const path = require("path");
 const Jimp = require("jimp");
 const nanoid = import("nanoid");
+const sgMail = require("@sendgrid/mail");
 
 require("dotenv").config();
 const secret = process.env.SECRET;
+sgMail.setApiKey(process.env.SENDGRID_KEY);
 const gravatar = require("gravatar");
 const fs = require("fs").promises;
 const storeImage = path.join(process.cwd(), "public", "avatars");
@@ -17,7 +19,6 @@ const getUsers = async (req, res, next) => {
   try {
     res.json(await usersService.get());
   } catch (e) {
-    console.log(e.message);
     next(e);
   }
 };
@@ -28,8 +29,7 @@ const tokenAuth = async (req, res, next) => {
     if (bearerString && bearerString !== "") {
       const bearer = [...bearerString];
       bearer.splice(0, 7);
-      if (!user || err || user.token !== bearer.join("")) {
-        console.log("Here");
+      if (!user || err || user.token !== bearer.join("") || user.verify === false) {
         return res.status(401).json({ message: "Not Authorized" });
       }
       req.user = user;
@@ -39,15 +39,76 @@ const tokenAuth = async (req, res, next) => {
   })(req, res, next);
 };
 
+const sendToken = async (email, token) => {
+  const msg = {
+    to: email,
+    subject: "Verification link for Contacts App",
+    from: process.env.SENDGRID_EMAIL,
+    text: `To verify click on the link: localhost:3000/api/users/verify/${token}`,
+    html: `To verify click on the link: <a href="http://localhost:3000/api/users/verify/${token}">localhost:3000/api/users/verify/${token}</a>`,
+  };
+  await sgMail.send(msg);
+};
+
+const resendVerify = async (req, res, next) => {
+  try {
+    if (!req.body.email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+    const foundUser = await usersService.getByEmail(req.body.email);
+    if (foundUser.length === 1) {
+      const user = foundUser[0];
+      if (user.verify === true) {
+        return res.status(400).json({ message: "User already verified" });
+      }
+      await sendToken(user.email, user.verificationToken);
+      return res.json();
+    }
+    if (foundUser.length > 1) {
+      return res.status(500).json({
+        message: "Multiple accounts with the same email, please contact with the administrator.",
+      });
+    }
+    return res.status(404).json({ message: "Not Found" });
+  } catch (e) {
+    return next(e);
+  }
+};
+
+const verifyEmail = async (req, res, next) => {
+  try {
+    const foundUser = await usersService.getByEmailToken(req.params.verificationToken);
+    if (foundUser.length === 1) {
+      const user = foundUser[0];
+      const updateResult = await usersService.update(user._id, {
+        verificationToken: null,
+        verify: true,
+      });
+      if (updateResult._id) {
+        return res.json({ message: "Verification successful" });
+      } else {
+        return res.status(500).json({ message: updateResult });
+      }
+    }
+    if (foundUser.length > 1) {
+      return res.status(500).json({
+        message:
+          "Multiple accounts with the same verification token, please contact with the administrator.",
+      });
+    }
+    return res.status(404).json({ message: "Not Found" });
+  } catch (e) {
+    return next(e);
+  }
+};
+
 const logout = async (req, res, next) => {
   try {
-    console.log("LOGOUT");
     const user = req.user;
     user.token = null;
     await usersService.update(user._id, user);
     return res.status(204).json();
   } catch (e) {
-    console.log(e.message);
     next(e);
   }
 };
@@ -58,7 +119,6 @@ const current = async (req, res, next) => {
     const payload = { email, subscription };
     return res.json(payload);
   } catch (e) {
-    console.log(e.message);
     next(e);
   }
 };
@@ -68,6 +128,9 @@ const login = async (req, res, next) => {
     if (req.body.email && req.body.password) {
       const user = (await usersService.getByEmail(req.body.email))[0];
       if (user) {
+        if (user.verify === false) {
+          return res.status(400).json({ message: "Must verify your email address first" });
+        }
         if (bcrypt.compareSync(req.body.password, user.password)) {
           const payload = {
             id: user._id,
@@ -83,7 +146,6 @@ const login = async (req, res, next) => {
     }
     res.status(400).json({ message: "Invalid user or password" });
   } catch (e) {
-    console.log(e.message);
     next(e);
   }
 };
@@ -133,20 +195,29 @@ const validateAndEncryptMiddleware = async (req, res, next) => {
   return res.status(409).json({ message: "Email already in use" });
 };
 
+const addVerificationToken = async (user) => {
+  user.verificationToken = (await nanoid).nanoid();
+  while ((await usersService.getByEmailToken(user.verificationToken))._id) {
+    user.verificationToken = (await nanoid).nanoid();
+  }
+};
+
 const signup = async (req, res, next) => {
   try {
     const user = req.body;
     if (user.email) {
       user.avatarURL = gravatar.url(user.email, { s: 200 });
     }
+    await addVerificationToken(user);
     const addResult = await usersService.add(user);
 
     if (addResult._id) {
+      await sendToken(user.email, user.verificationToken);
       return res
         .status(201)
         .json({ user: { email: addResult.email, subscription: addResult.subscription } });
     }
-    res.status(400).json(addResult.message);
+    return res.status(400).json(addResult.message);
   } catch (e) {
     next(e);
   }
@@ -194,4 +265,6 @@ module.exports = {
   tokenAuth,
   current,
   storeImage,
+  resendVerify,
+  verifyEmail,
 };

@@ -15,6 +15,8 @@ router.post("/login", usersController.login);
 router.get("/logout", usersController.tokenAuth, usersController.logout);
 
 router.get("/current", usersController.tokenAuth, usersController.current);
+router.get("/verify/:verificationToken", usersController.verifyEmail);
+router.post("/verify", usersController.resendVerify);
 
 router.patch(
   "/avatars",
